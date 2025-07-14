@@ -6,7 +6,7 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc",
-    "test": "node dist/test/demo.js"
+    "test": "ts-node test/demo.ts"
   },
   "keywords": [
     "search",
@@ -24,6 +24,12 @@
     "natural": "^6.2.3"
   },
   "devDependencies": {
+    "ts-node": "^10.9.2",
     "typescript": "^5.8.3"
-  }
+  },
+  "files": [
+    "dist",
+    "package.json",
+    "README.md"
+  ]
 }
