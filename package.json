@@ -1,0 +1,29 @@
+{
+  "name": "zetosearch",
+  "version": "1.0.0",
+  "description": "A lightweight Node.js full-text search library with support for multi-field indexing and TF-IDF ranking.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "node dist/test/demo.js"
+  },
+  "keywords": [
+    "search",
+    "text-search",
+    "full-text",
+    "tf-idf",
+    "nodejs",
+    "typescript",
+    "search-engine",
+    "document-indexing"
+  ],
+  "author": "Pujan Jani",
+  "license": "ISC",
+  "dependencies": {
+    "natural": "^6.2.3"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3"
+  }
+}
