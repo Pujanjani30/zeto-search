@@ -3,6 +3,10 @@ export interface ZetoSearchOptions {
   resultFields: string[];
   stopWords?: string[];
   fuzzyFactor?: number;
+  caseSensitive?: boolean;
+  minTokenLength?: number;
+  maxTokenLength?: number;
+  enableStemming?: boolean;
 }
 
 export interface SearchOptions {
@@ -12,6 +16,7 @@ export interface SearchOptions {
   sort?: SortOptions;
   limit?: number;
   offset?: number;
+  debug?: boolean;
 }
 
 export interface SortOptions {
@@ -20,13 +25,25 @@ export interface SortOptions {
 }
 
 export interface ZetoSearchResult {
-  [key: string]: string | number | boolean;
+  [key: string]: any;
   score: number;
 }
 
 export interface ZetoSearchResponse {
   results: ZetoSearchResult[];
   total: number;
+  totalResults: number;
+  query: string;
+  searchTime?: number;
+  debug?: DebugInfo;
+  error?: string;
+}
+
+export interface DebugInfo {
+  processedTokens: string[];
+  indexKeysMatched: number;
+  documentsScored: number;
+  averageScore: number;
 }
 
 export interface Posting {
