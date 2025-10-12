@@ -158,9 +158,7 @@ export class ZetoSearch<T extends Record<string, any> = any> {
          const limit = Math.max(1, options.limit || 10);
          const offset = Math.max(0, options.offset || 0);
 
-         // Handle phrase queries
-         const isPhrase = normalizedQuery.startsWith('"') && normalizedQuery.endsWith('"');
-         const searchQuery = isPhrase ? normalizedQuery.slice(1, -1) : normalizedQuery;
+         const searchQuery = normalizedQuery;
 
          const tokens = this.tokenizer.tokenize(searchQuery, {
             stem: this.options.enableStemming,
@@ -189,11 +187,7 @@ export class ZetoSearch<T extends Record<string, any> = any> {
          };
 
          // Search logic
-         if (isPhrase) {
-            this.searchPhrase(filteredTokens, fields, scores, debugInfo);
-         } else {
-            this.searchTokens(filteredTokens, fields, fuzzyFactor, scores, debugInfo);
-         }
+         this.searchTokens(filteredTokens, fields, fuzzyFactor, scores, debugInfo);
 
          // Filter and prepare results
          const candidateResults: ZetoSearchResult[] = [];
@@ -278,79 +272,6 @@ export class ZetoSearch<T extends Record<string, any> = any> {
             }
          }
       }
-   }
-
-   private searchPhrase(
-      tokens: string[],
-      fields: string[],
-      scores: Map<string | number, number>,
-      debugInfo: DebugInfo
-   ): void {
-      if (tokens.length < 2) {
-         this.searchTokens(tokens, fields, 0, scores, debugInfo);
-         return;
-      }
-
-      for (const field of fields) {
-         const candidates = new Map<string | number, number[][]>();
-
-         // Find all positions for each token
-         for (let i = 0; i < tokens.length; i++) {
-            const token = tokens[i];
-            const key = `${field}:${token}`;
-            const entry = this.index[key];
-
-            if (!entry) continue;
-
-            for (const docId in entry.postings) {
-               const positions = entry.postings[docId].positions;
-               if (!candidates.has(docId)) {
-                  candidates.set(docId, []);
-               }
-               candidates.get(docId)![i] = positions;
-            }
-         }
-
-         // Check for phrase matches
-         for (const [docId, tokenPositions] of candidates) {
-            if (tokenPositions.length !== tokens.length) continue;
-
-            const phraseScore = this.calculatePhraseScore(tokenPositions);
-            if (phraseScore > 0) {
-               const currentScore = scores.get(docId) || 0;
-               scores.set(docId, currentScore + phraseScore);
-               debugInfo.indexKeysMatched++;
-            }
-         }
-      }
-   }
-
-   private calculatePhraseScore(tokenPositions: number[][]): number {
-      if (!tokenPositions.every(positions => positions && positions.length > 0)) {
-         return 0;
-      }
-
-      let maxScore = 0;
-
-      for (const startPos of tokenPositions[0]) {
-         let consecutive = true;
-         let currentPos = startPos;
-
-         for (let i = 1; i < tokenPositions.length; i++) {
-            const nextPositions = tokenPositions[i];
-            if (!nextPositions.includes(currentPos + 1)) {
-               consecutive = false;
-               break;
-            }
-            currentPos++;
-         }
-
-         if (consecutive) {
-            maxScore = Math.max(maxScore, 2.0); // Higher score for exact phrases
-         }
-      }
-
-      return maxScore;
    }
 
    private scoreDocuments(
