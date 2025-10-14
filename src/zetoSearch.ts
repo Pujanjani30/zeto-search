@@ -21,7 +21,6 @@ export class ZetoSearch<T extends Record<string, any> = any> {
       this.tokenizer = new Tokenizer();
       this.options = {
          fuzzyFactor: 0.1,
-         caseSensitive: false,
          minTokenLength: 1,
          maxTokenLength: 50,
          enableStemming: false,
@@ -39,6 +38,22 @@ export class ZetoSearch<T extends Record<string, any> = any> {
       if (!options.resultFields || !Array.isArray(options.resultFields) || options.resultFields.length === 0) {
          throw new Error("resultFields is required and must be a non-empty array");
       }
+   }
+
+   private getDocId(doc: T): string {
+      const idAlias = this.options.idAlias || "id";
+      const idValue = doc[idAlias];
+      if (idValue === undefined || idValue === null) {
+         const preview = JSON.stringify(doc, null, 2).slice(0, 200);
+         throw new Error(
+            `ZetoSearch: Missing unique identifier field '${idAlias}' in one of the documents.\n` +
+            `Tip: Set 'idAlias' in options if your ID field has a different name.\n\n` +
+            `Example:\n  const search = new ZetoSearch({ idAlias: "_id", ... });\n\n` +
+            `Offending document:\n${preview}`
+         );
+      }
+
+      return String(idValue);
    }
 
    indexDocuments(docs: T[]): void {
@@ -67,11 +82,6 @@ export class ZetoSearch<T extends Record<string, any> = any> {
          return false;
       }
 
-      if (doc.id === undefined || doc.id === null) {
-         console.warn('Document missing required id field');
-         return false;
-      }
-
       return true;
    }
 
@@ -79,7 +89,7 @@ export class ZetoSearch<T extends Record<string, any> = any> {
    indexDocument(doc: T): void {
       if (!this.validateDocument(doc)) return;
 
-      const docId = String(doc.id);
+      const docId = this.getDocId(doc);
       this.documents.push(doc);
       this.documentMap.set(docId, doc);
       this.docsCount++;
@@ -94,7 +104,7 @@ export class ZetoSearch<T extends Record<string, any> = any> {
          const tokens = this.tokenizer.tokenize(content, {
             stem: this.options.enableStemming,
             minLength: this.options.minTokenLength,
-            maxLength: this.options.maxTokenLength
+            maxLength: this.options.maxTokenLength,
          });
 
          totalTokens += tokens.length;
@@ -158,12 +168,12 @@ export class ZetoSearch<T extends Record<string, any> = any> {
          const limit = Math.max(1, options.limit || 10);
          const offset = Math.max(0, options.offset || 0);
 
-         const searchQuery = normalizedQuery;
+         const searchQuery = normalizedQuery.toLowerCase();
 
          const tokens = this.tokenizer.tokenize(searchQuery, {
             stem: this.options.enableStemming,
             minLength: this.options.minTokenLength,
-            maxLength: this.options.maxTokenLength
+            maxLength: this.options.maxTokenLength,
          });
 
          const filteredTokens = tokens.filter(t => !this.stopWords.has(t));
@@ -252,13 +262,28 @@ export class ZetoSearch<T extends Record<string, any> = any> {
                debugInfo.indexKeysMatched++;
             }
 
+            for (const key in this.index) {
+               if (!key.startsWith(`${field}:`)) continue;
+
+               const token = key.substring(field.length + 1);
+               if (token === term) continue;
+
+               const prefixBoost = token.startsWith(term) ? 0.1 : 0;
+               const substringBoost = token.includes(term) && !token.startsWith(term) ? 0.05 : 0;
+
+               if (prefixBoost || substringBoost) {
+                  this.scoreDocuments(this.index[key], key, 1 + prefixBoost + substringBoost, scores);
+                  debugInfo.indexKeysMatched++;
+               }
+            }
+
             // Fuzzy matches
             const maxDistance = Math.round(term.length * fuzzyFactor);
             if (maxDistance > 0) {
                for (const key in this.index) {
                   if (key.startsWith(`${field}:`)) {
                      const token = key.substring(field.length + 1);
-                     if (token === term) continue; // Already processed
+                     if (token === term) continue;
 
                      const similarity = calculateSimilarity(term, token);
                      const distance = getDistance(term, token);
@@ -313,6 +338,7 @@ export class ZetoSearch<T extends Record<string, any> = any> {
       if (!query || query.trim() === "") return [];
 
       const tokens = this.tokenizer.tokenize(query.toLowerCase());
+
       if (!tokens.length) return [];
       const lastToken = tokens[tokens.length - 1];
       const suggestions = new Map<string, number>();
@@ -336,6 +362,46 @@ export class ZetoSearch<T extends Record<string, any> = any> {
          .sort((a, b) => b[1] - a[1])
          .slice(0, limit)
          .map(([token]) => token);
+   }
+
+   addDocument(doc: T): void {
+      this.indexDocument(doc);
+      this.calculateAverageDocLength();
+   }
+
+   updateDocument(doc: T): void {
+      const docId = this.getDocId(doc);
+      if (!docId) return;
+      this.removeDocument(docId);
+      this.indexDocument(doc);
+      this.calculateAverageDocLength();
+   }
+
+   removeDocument(docId: string | number): boolean {
+      if (!docId) return false;
+
+      const docIdStr = String(docId);
+      if (!this.documentMap.has(docIdStr)) return false;
+
+      const docIndex = this.documents.findIndex(d => d.id === docIdStr);
+      if (docIndex !== -1) {
+         this.documents.splice(docIndex, 1);
+         this.documentMap.delete(docIdStr);
+         this.docLengths.delete(docIdStr);
+         this.docsCount--;
+      }
+
+      for (const key in this.index) {
+         const postings = this.index[key].postings;
+         if (postings[docIdStr]) {
+            delete postings[docIdStr];
+            this.index[key].df--;
+            if (this.index[key].df <= 0) delete this.index[key];
+         }
+      }
+
+      this.calculateAverageDocLength();
+      return true;
    }
 
    // Statistics and debugging

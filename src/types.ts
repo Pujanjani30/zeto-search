@@ -3,10 +3,10 @@ export interface ZetoSearchOptions {
   resultFields: string[];
   stopWords?: string[];
   fuzzyFactor?: number;
-  caseSensitive?: boolean;
   minTokenLength?: number;
   maxTokenLength?: number;
   enableStemming?: boolean;
+  idAlias?: string;
 }
 
 export interface SearchOptions {

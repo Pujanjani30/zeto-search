@@ -102,12 +102,20 @@ console.log(suggestions);
 |---------|------|----------|-------------|
 | `searchFields` | `string[]` | *Required* | Fields to index for search |
 | `resultFields` | `string[]` | *Required* | Fields to return in results |
+| `idAlias` | `string` | `"id"` | Field name to use as the unique document ID |
 | `stopWords` | `string[]` | Common English stop words | Tokens to ignore |
 | `fuzzyFactor` | `number` | `0.1` | Controls fuzziness (0–1) |
-| `caseSensitive` | `boolean` | `false` | Enable case-sensitive search |
 | `minTokenLength` | `number` | `1` | Minimum token length |
 | `maxTokenLength` | `number` | `50` | Maximum token length |
 | `enableStemming` | `boolean` | `false` | Use Porter stemmer |
+
+<br>
+
+> **Note on `idAlias`:**  
+> The default `idAlias` is `"id"`. You can change it depending on your data source:  
+> - **MongoDB** usually uses `"_id"`  
+> - **SQL databases** or other sources may use custom IDs like `userId`, `emp_id`, etc.
+
 
 ---
 
@@ -144,6 +152,26 @@ console.log(searchEngine.getStats());
 ```
 
 ---
+
+## 🛠️ Document Management Methods
+
+### Add Document
+```ts
+searchEngine.addDocument(doc);
+```
+Adds a new document to the index and updates average document length. This allows you to add new documents on-the-fly without having to re-index all existing documents.
+
+### Update Document
+```ts
+searchEngine.updateDocument(doc);
+```
+Updates an existing document in the index. If the document doesn't exist, no changes are made. Useful for modifying documents without rebuilding the full index.
+
+### Remove Document
+```ts
+searchEngine.removeDocument(docId);
+```
+Removes a document by its ID and updates the index. Returns `true` if removed, otherwise `false`. Allows you to delete documents without affecting the rest of the index.
 
 ## 🧾 License
 **ISC License**
